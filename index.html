@@ -240,7 +240,7 @@
                             <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500">
                                 <input type="radio" name="paymentMethod" value="QRIS" class="accent-amber-500"> QRIS
                             </label>
-                            <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500">
+                            <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500" onclick="selectOnlineChannel('Transfer Bank')">
                                 <input type="radio" name="paymentMethod" value="Transfer Bank" class="accent-amber-500"> Transfer
                             </label>
                         </div>
@@ -286,7 +286,7 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- JAVASCRIPT LOGIC (Gabungan index.html & norek.js) -->
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const restoId = urlParams.get('resto') || 'default_resto';
@@ -306,6 +306,25 @@
         let cart = [];
         const adminWhatsAppNumber = "6289525935034";
         const ADMIN_PIN = "170620";
+
+        // Fungsi dari norek.js
+        function selectOnlineChannel(channelName) {
+            closeOnlinePay();
+            let noRekening = "BCA 7295061863 a.n. Muhammad Rizqi";
+            if (channelName.includes("QRIS")) {
+                noRekening = "Scan QRIS Resmi Resto (atas nama Resto & Cafe)";
+            }
+            alert(`Silakan lakukan pembayaran via ${channelName}\n\nTujuan Transfer:\n${noRekening}`);
+            finalizeOrder(`Online Paid (${channelName})`);
+        }
+
+        function closeOnlinePay() {
+            // Placeholder fungsi penutup pembayaran online jika ada
+        }
+
+        function finalizeOrder(status) {
+            console.log("Pesanan difinalisasi dengan status:", status);
+        }
 
         async function initApp() {
             document.getElementById('appTitle').innerText = restoName;
@@ -600,9 +619,9 @@
             const paymentMethod = getSelectedPaymentMethod();
             const orderNo = 'INV-' + Math.floor(100000 + Math.random() * 900000);
 
-            let message = `Halo Kasir *${restoName}*, pesanan baru (%${orderNo}):%0A`;
+            let message = `Halo Kasir *${restoName}*, pesanan baru (${orderNo}):%0A`;
             message += `👤 Nama: *${customerName}*%0A`;
-            message += `✉️ Email: *${customerEmail || '-'}*%0A`;
+            message += `📧 Email: *${customerEmail || '-'}*%0A`;
             message += `🪑 Meja: *${currentTable}*%0A`;
             message += `💳 Pembayaran: *${paymentMethod}*%0A%0A`;
             message += `*Daftar Pesanan:*%0A`;
@@ -614,7 +633,6 @@
             message += `Pajak/Layanan (10%): Rp ${tax.toLocaleString('id-ID')}%0A`;
             message += `*Total Bayar: Rp ${total.toLocaleString('id-ID')}*`;
 
-            // Kirim data riwayat & email ke cloud Google Apps Script jika URL aktif
             if (googleScriptUrl && customerEmail) {
                 await postToCloud({
                     action: "sendOrderHistory",
