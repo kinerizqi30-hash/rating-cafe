@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Menu & Kasir Resto</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#090d16',
+                        cardbg: '#131c31',
+                        accent: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .glass {
+            background: rgba(19, 28, 49, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { overscroll-behavior-y: none; }
+    </style>
+</head>
+<body class="bg-darkbg text-slate-100 font-sans antialiased flex justify-center min-h-screen" onload="initApp()">
+
+    <!-- MODAL SELAMAT DATANG / INPUT NAMA PELANGGAN -->
+    <div id="welcomeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 max-w-md mx-auto hidden">
+        <div class="glass w-full rounded-3xl p-6 shadow-2xl text-center border border-amber-500/30 space-y-4">
+            <div class="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/25">
+                <i class="fa-solid fa-utensils"></i>
+            </div>
+            <div>
+                <h2 id="welcomeRestoName" class="text-xl font-bold text-slate-100">Resto & Cafe</h2>
+                <p class="text-slate-400 text-xs mt-1">Masukkan nama Anda untuk mulai memesan.</p>
+            </div>
+            
+            <form onsubmit="saveCustomerName(event)" class="space-y-3 pt-2">
+                <input type="text" id="inputCustomerName" placeholder="Nama Pelanggan (Contoh: Budi)" required class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-amber-500 text-center font-semibold">
+                <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold rounded-2xl shadow-lg active:scale-95 transition text-sm">
+                    Mulai Pesan Menu <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+            </form>
+
+            <div class="border-t border-slate-800 pt-3 mt-2">
+                <button onclick="showAdminLogin()" class="w-full py-2.5 bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-amber-400 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-lock"></i> Login Admin / Owner Resto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL LOGIN ADMIN -->
+    <div id="adminLoginModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 max-w-md mx-auto hidden">
+        <div class="glass w-full rounded-3xl p-6 shadow-2xl text-center border border-amber-500/30 space-y-4">
+            <div class="w-16 h-16 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-red-500/25">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <h2 class="text-xl font-bold text-slate-100">Login Admin / Owner</h2>
+                <p class="text-slate-400 text-xs mt-1">Masukkan PIN rahasia untuk mengelola menu.</p>
+            </div>
+            
+            <form onsubmit="verifyAdminPin(event)" class="space-y-3 pt-2">
+                <input type="password" id="inputAdminPin" placeholder="PIN (Default: 1234)" required class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-red-500 text-center font-semibold tracking-widest">
+                <button type="submit" class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold rounded-2xl shadow-lg active:scale-95 transition text-sm">
+                    Masuk Panel Admin
+                </button>
+            </form>
+            <button onclick="backToWelcome()" class="text-slate-400 hover:text-white text-xs mt-2 underline">Kembali</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP MOBILE FRAME -->
+    <div class="w-full max-w-md bg-darkbg min-h-screen relative shadow-2xl flex flex-col pb-24 border-x border-slate-800">
+        <div id="appContainer" class="flex flex-col flex-1">
+            <header class="sticky top-0 z-30 glass border-b border-slate-800/80 px-4 py-3 flex justify-between items-center backdrop-blur-md">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center font-bold text-sm border border-amber-500/30">
+                        <i class="fa-solid fa-utensils"></i>
+                    </div>
+                    <div>
+                        <h1 id="appTitle" class="text-sm font-bold text-slate-100 leading-tight">Resto & Cafe</h1>
+                        <div class="flex items-center gap-2 text-[11px] text-amber-400 font-medium">
+                            <span onclick="changeTable()" class="cursor-pointer hover:underline flex items-center gap-1">
+                                <i class="fa-solid fa-chair text-[10px]"></i> <span id="currentTableName">Meja 01</span>
+                            </span>
+                            <span class="text-slate-600">|</span>
+                            <span onclick="changeCustomerName()" class="cursor-pointer hover:underline text-slate-300 truncate max-w-[120px]">
+                                <i class="fa-solid fa-user text-[10px] text-amber-400"></i> <span id="currentCustomerName">-</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="showAdminLogin()" class="p-2 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-amber-400 rounded-xl text-xs transition" title="Login Admin">
+                        <i class="fa-solid fa-lock"></i>
+                    </button>
+                    <button onclick="openCart()" class="relative p-2.5 bg-amber-500 text-slate-950 rounded-xl font-bold shadow-md active:scale-95 transition">
+                        <i class="fa-solid fa-bag-shopping text-sm"></i>
+                        <span id="cartBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold hidden shadow">0</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- KATEGORI SCROLL -->
+            <div class="px-4 py-3 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+                <button onclick="filterCategory('All')" class="cat-btn px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs whitespace-nowrap transition shadow">Semua</button>
+                <button onclick="filterCategory('Makanan')" class="cat-btn px-4 py-2 bg-slate-800/80 text-slate-300 font-semibold rounded-xl text-xs whitespace-nowrap transition border border-slate-700/60">Makanan</button>
+                <button onclick="filterCategory('Minuman')" class="cat-btn px-4 py-2 bg-slate-800/80 text-slate-300 font-semibold rounded-xl text-xs whitespace-nowrap transition border border-slate-700/60">Minuman</button>
+                <button onclick="filterCategory('Dessert')" class="cat-btn px-4 py-2 bg-slate-800/80 text-slate-300 font-semibold rounded-xl text-xs whitespace-nowrap transition border border-slate-700/60">Dessert</button>
+            </div>
+
+            <!-- MENU GRID -->
+            <main class="px-4 py-1 flex-1">
+                <div id="menuGrid" class="grid grid-cols-2 gap-3"></div>
+            </main>
+        </div>
+
+        <!-- ADMIN MODAL -->
+        <div id="adminModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-3 hidden max-w-md mx-auto">
+            <div class="glass w-full h-[90vh] flex flex-col rounded-3xl p-5 shadow-2xl border border-slate-700 overflow-hidden">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800 shrink-0">
+                    <h2 class="text-base font-bold text-amber-400"><i class="fa-solid fa-cash-register"></i> Panel Kasir & Cloud Sync</h2>
+                    <button onclick="closeAdminMode()" class="text-slate-400 hover:text-white text-base"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto pr-1 space-y-4">
+                    <!-- Integrasi Google Apps Script Web App URL -->
+                    <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 space-y-2">
+                        <h3 class="text-xs font-bold text-amber-400"><i class="fa-solid fa-cloud"></i> URL Web App Google Script</h3>
+                        <p class="text-[10px] text-slate-400">Masukkan URL Web App Google Sheets milik resto ini.</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="inputScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                            <button onclick="saveScriptUrl()" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition">Simpan</button>
+                        </div>
+                    </div>
+
+                    <!-- Pengaturan Nama Resto -->
+                    <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 space-y-2">
+                        <h3 class="text-xs font-bold text-amber-400"><i class="fa-solid fa-store"></i> Nama Resto / Cafe</h3>
+                        <div class="flex gap-2">
+                            <input type="text" id="inputRestoName" placeholder="Nama Resto..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                            <button onclick="saveRestoName()" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition">Simpan</button>
+                        </div>
+                    </div>
+
+                    <!-- Form Tambah Menu -->
+                    <form id="menuForm" onsubmit="handleAddMenu(event)" class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 space-y-2.5">
+                        <input type="hidden" id="menuId">
+                        <h3 id="formTitle" class="text-xs font-bold text-slate-200">Tambah Menu Baru</h3>
+                        <input type="text" id="inputName" placeholder="Nama Makanan / Minuman" required class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="inputCategory" class="bg-slate-800 border border-slate-700 rounded-xl px-2 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                                <option value="Makanan">Makanan</option>
+                                <option value="Minuman">Minuman</option>
+                                <option value="Dessert">Dessert</option>
+                            </select>
+                            <input type="number" id="inputPrice" placeholder="Harga (Rp)" required class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                        </div>
+                        <input type="text" id="inputImage" placeholder="URL Gambar" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
+                        <textarea id="inputDesc" placeholder="Deskripsi..." rows="2" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"></textarea>
+                        <button type="submit" class="w-full py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs hover:opacity-90 transition">Simpan ke Cloud</button>
+                    </form>
+
+                    <h3 class="text-xs font-bold text-slate-200 pt-2">Daftar Menu Aktif</h3>
+                    <div id="adminMenuCards" class="space-y-2 pb-4"></div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-800 shrink-0 text-center">
+                    <button onclick="closeAdminMode()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold">Tutup Panel Kasir</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CART MODAL -->
+        <div id="cartModal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm hidden max-w-md mx-auto">
+            <div class="glass w-full rounded-t-3xl p-5 shadow-2xl max-h-[80vh] flex flex-col border-t border-slate-700">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+                    <h3 class="font-bold text-sm text-amber-400"><i class="fa-solid fa-receipt"></i> Keranjang Pesanan</h3>
+                    <button onclick="closeCart()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+                </div>
+                <div id="cartItemsList" class="flex-1 overflow-y-auto space-y-2.5 pr-1 my-1"></div>
+                <div class="border-t border-slate-800 pt-3 mt-2 space-y-2">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <span>Pemesan / Meja:</span>
+                        <span class="font-bold text-amber-400"><span id="cartCustomerName">-</span> (<span id="cartTableName">Meja 01</span>)</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-sm">
+                        <span>Total Pembayaran:</span>
+                        <span id="cartTotalPrice" class="text-amber-400 text-base">Rp 0</span>
+                    </div>
+                    <button onclick="checkoutWhatsApp()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 mt-2 text-xs">
+                        <i class="fa-brands fa-whatsapp text-base"></i> Kirim Pesanan ke Kasir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const restoId = urlParams.get('resto') || 'default_resto';
+
+        const STORAGE_KEY_MENUS = `resto_menus_${restoId}`;
+        const STORAGE_KEY_NAME = `resto_name_${restoId}`;
+        const STORAGE_KEY_TABLE = `resto_table_${restoId}`;
+        const STORAGE_KEY_SCRIPT = `resto_script_${restoId}`;
+
+        let restoName = localStorage.getItem(STORAGE_KEY_NAME) || "Resto & Cafe (" + restoId + ")";
+        let menus = JSON.parse(localStorage.getItem(STORAGE_KEY_MENUS)) || [];
+        let currentTable = localStorage.getItem(STORAGE_KEY_TABLE) || "Meja 01";
+        let customerName = localStorage.getItem('customer_name') || "";
+        let googleScriptUrl = localStorage.getItem(STORAGE_KEY_SCRIPT) || "";
+        let activeCategory = "All";
+        const adminWhatsAppNumber = "6289525935034";
+        const ADMIN_PIN = "1234";
+
+        async function initApp() {
+            document.getElementById('appTitle').innerText = restoName;
+            document.getElementById('welcomeRestoName').innerText = restoName;
+            document.getElementById('currentTableName').innerText = currentTable;
+
+            if (googleScriptUrl) {
+                await fetchMenusFromCloud();
+            }
+
+            if (!customerName || customerName.trim() === "") {
+                document.getElementById('welcomeModal').classList.remove('hidden');
+            } else {
+                document.getElementById('currentCustomerName').innerText = customerName;
+                renderCustomerMenu();
+            }
+        }
+
+        async function fetchMenusFromCloud() {
+            try {
+                let res = await fetch(`${googleScriptUrl}?action=getMenus`);
+                let cloudMenus = await res.json();
+                if (Array.isArray(cloudMenus) && cloudMenus.length > 0) {
+                    menus = cloudMenus;
+                    localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
+                }
+            } catch (err) {
+                console.log("Gagal sync cloud:", err);
+            }
+        }
+
+        async function postToCloud(payload) {
+            if (!googleScriptUrl) return;
+            try {
+                await fetch(googleScriptUrl, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+            } catch (err) {
+                console.log("Gagal mengirim ke cloud:", err);
+            }
+        }
+
+        function saveScriptUrl() {
+            let url = document.getElementById('inputScriptUrl').value.trim();
+            if (url) {
+                googleScriptUrl = url;
+                localStorage.setItem(STORAGE_KEY_SCRIPT, googleScriptUrl);
+                alert("URL Script disimpan! Mengambil data...");
+                fetchMenusFromCloud().then(() => {
+                    renderAdminCards();
+                    renderCustomerMenu();
+                    alert("Sinkronisasi berhasil!");
+                });
+            }
+        }
+
+        function saveCustomerName(e) {
+            e.preventDefault();
+            let name = document.getElementById('inputCustomerName').value.trim();
+            if (name) {
+                customerName = name;
+                localStorage.setItem('customer_name', customerName);
+                document.getElementById('currentCustomerName').innerText = customerName;
+                document.getElementById('welcomeModal').classList.add('hidden');
+                document.getElementById('inputCustomerName').value = "";
+                renderCustomerMenu();
+            }
+        }
+
+        function showAdminLogin() {
+            document.getElementById('welcomeModal').classList.add('hidden');
+            document.getElementById('adminLoginModal').classList.remove('hidden');
+            document.getElementById('inputAdminPin').value = "";
+        }
+
+        function backToWelcome() {
+            document.getElementById('adminLoginModal').classList.add('hidden');
+            if (!customerName || customerName.trim() === "") {
+                document.getElementById('welcomeModal').classList.remove('hidden');
+            }
+        }
+
+        function verifyAdminPin(e) {
+            e.preventDefault();
+            if (document.getElementById('inputAdminPin').value === ADMIN_PIN) {
+                document.getElementById('adminLoginModal').classList.add('hidden');
+                openAdminMode();
+            } else {
+                alert("PIN Salah!");
+                document.getElementById('inputAdminPin').value = "";
+            }
+        }
+
+        function changeCustomerName() {
+            let newName = prompt("Ubah Nama Pemesan:", customerName);
+            if (newName && newName.trim() !== "") {
+                customerName = newName.trim();
+                localStorage.setItem('customer_name', customerName);
+                document.getElementById('currentCustomerName').innerText = customerName;
+            }
+        }
+
+        function saveRestoName() {
+            let newName = document.getElementById('inputRestoName').value.trim();
+            if (newName) {
+                restoName = newName;
+                localStorage.setItem(STORAGE_KEY_NAME, restoName);
+                document.getElementById('appTitle').innerText = restoName;
+                document.getElementById('welcomeRestoName').innerText = restoName;
+                alert("Nama resto diperbarui!");
+            }
+        }
+
+        function changeTable() {
+            let newTable = prompt("Nomor Meja:", currentTable);
+            if (newTable && newTable.trim() !== "") {
+                currentTable = newTable.trim();
+                localStorage.setItem(STORAGE_KEY_TABLE, currentTable);
+                document.getElementById('currentTableName').innerText = currentTable;
+            }
+        }
+
+        function renderCustomerMenu() {
+            const grid = document.getElementById('menuGrid');
+            grid.innerHTML = "";
+            const filtered = activeCategory === 'All' ? menus : menus.filter(m => m.category === activeCategory);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-400 text-xs">Belum ada menu. Silakan sinkronkan Google Sheets di Admin.</div>`;
+                return;
+            }
+
+            filtered.forEach(menu => {
+                const isSoldOut = menu.status === 'Habis';
+                grid.innerHTML += `
+                    <div class="glass rounded-2xl overflow-hidden border border-slate-700/50 shadow-md flex flex-col justify-between">
+                        <div>
+                            <div class="h-28 w-full bg-slate-800 relative overflow-hidden">
+                                <img src="${menu.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=300&q=80'}" alt="${menu.name}" class="w-full h-full object-cover ${isSoldOut ? 'grayscale opacity-40' : ''}">
+                                <span class="absolute top-1.5 right-1.5 px-2 py-0.5 text-[9px] font-bold rounded-md ${isSoldOut ? 'bg-red-500 text-white' : 'bg-amber-500 text-slate-950'}">${menu.status}</span>
+                            </div>
+                            <div class="p-2.5">
+                                <span class="text-[9px] uppercase font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">${menu.category}</span>
+                                <h3 class="font-bold text-xs mt-1 text-slate-100 line-clamp-1">${menu.name}</h3>
+                                <p class="text-[10px] text-slate-400 mt-0.5 line-clamp-2 leading-tight">${menu.desc || '-'}</p>
+                            </div>
+                        </div>
+                        <div class="p-2.5 pt-0 flex items-center justify-between">
+                            <span class="font-bold text-amber-400 text-xs">Rp ${Number(menu.price).toLocaleString('id-ID')}</span>
+                            <button onclick="addToCart('${menu.id}')" ${isSoldOut ? 'disabled' : ''} class="w-7 h-7 rounded-xl font-bold text-xs flex items-center justify-center transition ${isSoldOut ? 'bg-slate-800 text-slate-600 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow'}">
+                                <i class="fa-solid fa-plus text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function filterCategory(cat) {
+            activeCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if (btn.innerText.includes(cat) || (cat === 'All' && btn.innerText === 'Semua')) {
+                    btn.className = "cat-btn px-4 py-2 bg-amber-500 text-slate-950 font-bold rounded-xl text-xs whitespace-nowrap transition shadow";
+                } else {
+                    btn.className = "cat-btn px-4 py-2 bg-slate-800/80 text-slate-300 font-semibold rounded-xl text-xs whitespace-nowrap transition border border-slate-700/60";
+                }
+            });
+            renderCustomerMenu();
+        }
+
+        let cart = [];
+        function addToCart(id) {
+            const menu = menus.find(m => m.id == id);
+            const existing = cart.find(item => item.id == id);
+            if (existing) { existing.qty += 1; } else { cart.push({ ...menu, qty: 1 }); }
+            updateCartBadge();
+        }
+
+        function updateCartBadge() {
+            const badge = document.getElementById('cartBadge');
+            const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+            if (totalQty > 0) {
+                badge.innerText = totalQty;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function openCart() {
+            const list = document.getElementById('cartItemsList');
+            list.innerHTML = "";
+            if (cart.length === 0) {
+                list.innerHTML = `<p class="text-center text-slate-400 py-6 text-xs">Keranjang kosong.</p>`;
+            } else {
+                cart.forEach((item, index) => {
+                    list.innerHTML += `
+                        <div class="flex items-center justify-between bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-xs">
+                            <div class="pr-2">
+                                <h4 class="font-bold text-slate-200 line-clamp-1">${item.name}</h4>
+                                <span class="text-[11px] text-amber-400">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button onclick="changeQty(${index}, -1)" class="w-6 h-6 bg-slate-800 rounded-lg flex items-center justify-center font-bold text-slate-300">-</button>
+                                <span class="text-xs font-bold w-3 text-center">${item.qty}</span>
+                                <button onclick="changeQty(${index}, 1)" class="w-6 h-6 bg-slate-800 rounded-lg flex items-center justify-center font-bold text-slate-300">+</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('cartTableName').innerText = currentTable;
+            document.getElementById('cartCustomerName').innerText = customerName;
+            const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            document.getElementById('cartTotalPrice').innerText = `Rp ${totalPrice.toLocaleString('id-ID')}`;
+            document.getElementById('cartModal').classList.remove('hidden');
+        }
+
+        function closeCart() { document.getElementById('cartModal').classList.add('hidden'); }
+
+        function changeQty(index, delta) {
+            cart[index].qty += delta;
+            if (cart[index].qty <= 0) { cart.splice(index, 1); }
+            updateCartBadge();
+            openCart();
+        }
+
+        function checkoutWhatsApp() {
+            if (cart.length === 0) return;
+            let message = `Halo Kasir *${restoName}*, pesanan baru:%0A`;
+            message += `👤 Nama: *${customerName}*%0A`;
+            message += `🪑 Meja: *${currentTable}*%0A%0A`;
+            message += `*Daftar Pesanan:*%0A`;
+            let total = 0;
+            cart.forEach(item => {
+                let subtotal = item.price * item.qty;
+                total += subtotal;
+                message += `- ${item.name} (${item.qty}x) = Rp ${subtotal.toLocaleString('id-ID')}%0A`;
+            });
+            message += `%0A*Total Bayar: Rp ${total.toLocaleString('id-ID')}*`;
+            
+            window.open(`https://wa.me/${adminWhatsAppNumber}?text=${message}`, '_blank');
+
+            closeCart();
+            cart = [];
+            updateCartBadge();
+            localStorage.removeItem('customer_name');
+            customerName = "";
+            document.getElementById('welcomeModal').classList.remove('hidden');
+        }
+
+        function openAdminMode() {
+            closeCart();
+            document.getElementById('inputRestoName').value = restoName;
+            document.getElementById('inputScriptUrl').value = googleScriptUrl;
+            document.getElementById('adminModal').classList.remove('hidden');
+            renderAdminCards();
+        }
+
+        function closeAdminMode() {
+            document.getElementById('adminModal').classList.add('hidden');
+            renderCustomerMenu();
+        }
+
+        function renderAdminCards() {
+            const container = document.getElementById('adminMenuCards');
+            container.innerHTML = "";
+            menus.forEach(menu => {
+                const isSoldOut = menu.status === 'Habis';
+                container.innerHTML += `
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                        <div class="pr-2">
+                            <h4 class="font-bold text-slate-200 line-clamp-1">${menu.name}</h4>
+                            <p class="text-amber-400 font-semibold">Rp ${Number(menu.price).toLocaleString('id-ID')}</p>
+                            <span class="text-[9px] text-slate-400">${menu.category}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="toggleStock('${menu.id}')" class="px-2 py-1 text-[9px] font-bold rounded-lg ${isSoldOut ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'}">
+                                ${menu.status}
+                            </button>
+                            <button onclick="editMenu('${menu.id}')" class="p-1.5 bg-slate-800 text-amber-400 rounded-lg"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                            <button onclick="deleteMenu('${menu.id}')" class="p-1.5 bg-slate-800 text-red-400 rounded-lg"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function handleAddMenu(e) {
+            e.preventDefault();
+            const id = document.getElementById('menuId').value || 'MN-' + Date.now();
+            const name = document.getElementById('inputName').value;
+            const category = document.getElementById('inputCategory').value;
+            const price = Number(document.getElementById('inputPrice').value);
+            const image = document.getElementById('inputImage').value;
+            const desc = document.getElementById('inputDesc').value;
+            const status = "Tersedia";
+
+            const menuData = { id, name, category, price, desc, image, status };
+
+            const index = menus.findIndex(m => m.id == id);
+            if (index !== -1) {
+                menus[index] = menuData;
+            } else {
+                menus.push(menuData);
+            }
+
+            localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
+            postToCloud({ action: "saveOrUpdateMenu", ...menuData });
+            resetForm();
+            renderAdminCards();
+        }
+
+        function editMenu(id) {
+            const menu = menus.find(m => m.id == id);
+            if (!menu) return;
+            document.getElementById('menuId').value = menu.id;
+            document.getElementById('inputName').value = menu.name;
+            document.getElementById('inputCategory').value = menu.category;
+            document.getElementById('inputPrice').value = menu.price;
+            document.getElementById('inputImage').value = menu.image || '';
+            document.getElementById('inputDesc').value = menu.desc || '';
+            document.getElementById('formTitle').innerText = "Edit: " + menu.name;
+        }
+
+        function deleteMenu(id) {
+            if (confirm("Hapus menu ini?")) {
+                menus = menus.filter(m => m.id != id);
+                localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
+                postToCloud({ action: "deleteMenu", id: id });
+                renderAdminCards();
+            }
+        }
+
+        function toggleStock(id) {
+            const menu = menus.find(m => m.id == id);
+            if (menu) {
+                menu.status = menu.status === 'Tersedia' ? 'Habis' : 'Tersedia';
+                localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
+                postToCloud({ action: "saveOrUpdateMenu", ...menu });
+                renderAdminCards();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('menuForm').reset();
+            document.getElementById('menuId').value = "";
+            document.getElementById('formTitle').innerText = "Tambah Menu Baru";
+        }
+    </script>
+</body>
+</html>
