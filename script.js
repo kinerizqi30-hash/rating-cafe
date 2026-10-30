@@ -15,11 +15,12 @@ let googleScriptUrl = localStorage.getItem(STORAGE_KEY_SCRIPT) || "";
 let activeCategory = "All";
 let cart = [];
 let currentTransactionData = null;
+let paymentTimer = null; // Variabel untuk timer batas waktu pembayaran
 const ADMIN_PIN = "170620";
 
 // KONFIGURASI REKENING OWNER
 const ownerBankName = "BCA";
-const ownerAccountNumber = "7295061863"; // Ganti dengan nomor rekening owner asli
+const ownerAccountNumber = "7295061863"; // Nomor rekening owner
 const ownerAccountName = "Muhammad Rizqi";
 
 async function initApp() {
@@ -252,12 +253,12 @@ function openCart() {
     }
     document.getElementById('cartTableName').innerText = currentTable;
     document.getElementById('cartCustomerName').innerText = customerName;
-    
+
     const { subtotal, tax, total } = calculateTotals();
     document.getElementById('cartSubtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
     document.getElementById('cartTax').innerText = `Rp ${tax.toLocaleString('id-ID')}`;
     document.getElementById('cartTotalPrice').innerText = `Rp ${total.toLocaleString('id-ID')}`;
-    
+
     document.getElementById('cartModal').classList.remove('hidden');
 }
 
@@ -304,46 +305,84 @@ function processCheckout() {
     }
 }
 
+// Fitur Countdown Timer Batas Waktu Pembayaran (15 Menit)
+function startPaymentCountdown(durationInSeconds) {
+    if (paymentTimer) clearInterval(paymentTimer);
+    let timer = durationInSeconds;
+
+    paymentTimer = setInterval(() => {
+        let minutes = parseInt(timer / 60, 10);
+        let seconds = parseInt(timer % 60, 10);
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        const countdownElement = document.getElementById('paymentCountdown');
+        if (countdownElement) {
+            countdownElement.innerText = `${minutes}:${seconds}`;
+        }
+
+        if (--timer < 0) {
+            clearInterval(paymentTimer);
+            alert("Batas waktu pembayaran telah habis. Silakan buat pesanan ulang.");
+            closeOnlinePaymentModal();
+        }
+    }, 1000);
+}
+
 function openQrisModal(orderNo, total) {
     document.getElementById('paymentChannelIcon').className = "fa-solid fa-qrcode";
     document.getElementById('paymentChannelTitle').innerText = "Pembayaran QRIS Otomatis";
     document.getElementById('paymentChannelContent').innerHTML = `
+        <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-2 text-xs text-red-400 font-bold flex justify-between items-center">
+            <span><i class="fa-solid fa-clock"></i> Batas Waktu:</span>
+            <span id="paymentCountdown" class="text-sm font-mono">15:00</span>
+        </div>
         <p class="text-[11px] text-slate-300">Scan QR Code di bawah menggunakan E-Wallet atau M-Banking Anda:</p>
         <div class="bg-white p-3 rounded-2xl w-40 h-40 mx-auto flex items-center justify-center shadow">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PAY_${orderNo}_${total}" alt="QRIS" class="w-full h-full object-contain">
         </div>
         <div class="text-xs font-bold text-amber-400">Total: Rp ${total.toLocaleString('id-ID')}</div>
-        <p class="text-[10px] text-slate-400">Dana langsung masuk ke rekening owner secara real-time.</p>
+        <p class="text-[10px] text-slate-400">Dana otomatis diverifikasi dan masuk ke rekening owner secara real-time.</p>
     `;
     document.getElementById('onlinePaymentModal').classList.remove('hidden');
+    startPaymentCountdown(15 * 60); // 15 Menit
 }
 
 function openVirtualAccountModal(orderNo, total) {
-    const vaNumber = "880" + Math.floor(1000000000 + Math.random() * 9000000000);
+    // Menghasilkan nomor Virtual Account otomatis berdasarkan kode prefix bank + nomor rekening owner
+    const vaNumber = "880" + ownerAccountNumber;
+
     document.getElementById('paymentChannelIcon').className = "fa-solid fa-building-columns";
-    document.getElementById('paymentChannelTitle').innerText = "Transfer Bank / Virtual Account";
+    document.getElementById('paymentChannelTitle').innerText = "Virtual Account Otomatis";
     document.getElementById('paymentChannelContent').innerHTML = `
-        <p class="text-[11px] text-slate-300">Silakan transfer pembayaran ke rekening owner berikut:</p>
-        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-left space-y-1">
-            <div class="flex justify-between text-[11px]"><span class="text-slate-400">Bank:</span> <span class="font-bold text-slate-200">${ownerBankName}</span></div>
-            <div class="flex justify-between text-[11px]"><span class="text-slate-400">No. Rekening:</span> <span class="font-mono font-bold text-amber-400">${ownerAccountNumber}</span></div>
-            <div class="flex justify-between text-[11px]"><span class="text-slate-400">Atas Nama:</span> <span class="font-bold text-slate-200">${ownerAccountName}</span></div>
+        <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-2 text-xs text-red-400 font-bold flex justify-between items-center">
+            <span><i class="fa-solid fa-clock"></i> Batas Waktu:</span>
+            <span id="paymentCountdown" class="text-sm font-mono">15:00</span>
         </div>
-        <div class="text-xs font-bold text-amber-400 pt-1">Total Bayar: Rp ${total.toLocaleString('id-ID')}</div>
-        <p class="text-[10px] text-slate-400">Sistem otomatis mendeteksi pembayaran masuk ke owner.</p>
+        <p class="text-[11px] text-slate-300">Silakan lakukan transfer pembayaran ke nomor Virtual Account ${ownerBankName}:</p>
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-left space-y-1.5">
+            <div class="flex justify-between text-[11px]"><span class="text-slate-400">Bank Tujuan:</span> <span class="font-bold text-slate-200">${ownerBankName}</span></div>
+            <div class="flex justify-between text-[11px]"><span class="text-slate-400">No. Virtual Account:</span> <span class="font-mono font-bold text-amber-400">${vaNumber}</span></div>
+            <div class="flex justify-between text-[11px]"><span class="text-slate-400">Nama Penerima:</span> <span class="font-bold text-slate-200">${ownerAccountName}</span></div>
+        </div>
+        <div class="text-xs font-bold text-amber-400 pt-1">Total Tagihan: Rp ${total.toLocaleString('id-ID')}</div>
+        <p class="text-[10px] text-slate-400">Sistem otomatis mendeteksi mutasi masuk ke rekening owner.</p>
     `;
     document.getElementById('onlinePaymentModal').classList.remove('hidden');
+    startPaymentCountdown(15 * 60); // 15 Menit
 }
 
 function closeOnlinePaymentModal() {
+    if (paymentTimer) clearInterval(paymentTimer);
     document.getElementById('onlinePaymentModal').classList.add('hidden');
-    openCart(); // Kembali membuka modal keranjang ketika dibatalkan
+    openCart();
 }
 
 async function simulateSuccessfulPayment() {
-    closeOnlinePaymentModal();
-    // Jangan lupa tutup cart juga kalau sebelumnya dibuka ulang di closeOnlinePaymentModal
-    document.getElementById('cartModal').classList.add('hidden'); 
+    if (paymentTimer) clearInterval(paymentTimer);
+    document.getElementById('onlinePaymentModal').classList.add('hidden');
+    document.getElementById('cartModal').classList.add('hidden');
     await finalizeOrderDirectly(currentTransactionData.paymentMethod);
 }
 
