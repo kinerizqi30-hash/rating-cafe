@@ -21,6 +21,6 @@ body { overscroll-behavior-y: none; }
         top: 0;
         width: 100%;
         background: white !important;
-        color: black !important;
+        color: #000000 !important;
     }
 }
