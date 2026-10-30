@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Menu & Kasir Resto</title>
+    <title>Menu Rating Cafe</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -31,11 +31,28 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         body { overscroll-behavior-y: none; }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableReceipt, #printableReceipt * {
+                visibility: visible;
+            }
+            #printableReceipt {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                background: white !important;
+                color: black !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-darkbg text-slate-100 font-sans antialiased flex justify-center min-h-screen" onload="initApp()">
 
-    <!-- MODAL SELAMAT DATANG / INPUT NAMA PELANGGAN -->
+    <!-- MODAL SELAMAT DATANG / INPUT NAMA & EMAIL PELANGGAN -->
     <div id="welcomeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4 max-w-md mx-auto hidden">
         <div class="glass w-full rounded-3xl p-6 shadow-2xl text-center border border-amber-500/30 space-y-4">
             <div class="w-16 h-16 bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-amber-500/25">
@@ -46,8 +63,9 @@
                 <p class="text-slate-400 text-xs mt-1">Masukkan nama Anda untuk mulai memesan.</p>
             </div>
             
-            <form onsubmit="saveCustomerName(event)" class="space-y-3 pt-2">
+            <form onsubmit="saveCustomerData(event)" class="space-y-3 pt-2">
                 <input type="text" id="inputCustomerName" placeholder="Nama Pelanggan (Contoh: Budi)" required class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-amber-500 text-center font-semibold">
+                <input type="email" id="inputCustomerEmail" placeholder="Email untuk Riwayat Struk (Opsional)" class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-amber-500 text-center">
                 <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-extrabold rounded-2xl shadow-lg active:scale-95 transition text-sm">
                     Mulai Pesan Menu <i class="fa-solid fa-arrow-right ml-1"></i>
                 </button>
@@ -73,7 +91,7 @@
             </div>
             
             <form onsubmit="verifyAdminPin(event)" class="space-y-3 pt-2">
-                <input type="password" id="inputAdminPin" placeholder="PIN (Default: 1234)" required class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-red-500 text-center font-semibold tracking-widest">
+                <input type="password" id="inputAdminPin" placeholder="PIN Admin" required class="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-sm text-slate-100 focus:outline-none focus:border-red-500 text-center font-semibold tracking-widest">
                 <button type="submit" class="w-full py-3.5 bg-red-600 hover:bg-red-500 text-white font-extrabold rounded-2xl shadow-lg active:scale-95 transition text-sm">
                     Masuk Panel Admin
                 </button>
@@ -97,7 +115,7 @@
                                 <i class="fa-solid fa-chair text-[10px]"></i> <span id="currentTableName">Meja 01</span>
                             </span>
                             <span class="text-slate-600">|</span>
-                            <span onclick="changeCustomerName()" class="cursor-pointer hover:underline text-slate-300 truncate max-w-[120px]">
+                            <span onclick="changeCustomerDataPrompt()" class="cursor-pointer hover:underline text-slate-300 truncate max-w-[120px]">
                                 <i class="fa-solid fa-user text-[10px] text-amber-400"></i> <span id="currentCustomerName">-</span>
                             </span>
                         </div>
@@ -140,7 +158,7 @@
                     <!-- Integrasi Google Apps Script Web App URL -->
                     <div class="bg-slate-900/60 p-3 rounded-2xl border border-slate-800 space-y-2">
                         <h3 class="text-xs font-bold text-amber-400"><i class="fa-solid fa-cloud"></i> URL Web App Google Script</h3>
-                        <p class="text-[10px] text-slate-400">Masukkan URL Web App Google Sheets milik resto ini.</p>
+                        <p class="text-[10px] text-slate-400">Masukkan URL Web App Google Sheets untuk database menu dan email riwayat.</p>
                         <div class="flex gap-2">
                             <input type="text" id="inputScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500">
                             <button onclick="saveScriptUrl()" class="px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition">Simpan</button>
@@ -186,25 +204,84 @@
 
         <!-- CART MODAL -->
         <div id="cartModal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm hidden max-w-md mx-auto">
-            <div class="glass w-full rounded-t-3xl p-5 shadow-2xl max-h-[80vh] flex flex-col border-t border-slate-700">
+            <div class="glass w-full rounded-t-3xl p-5 shadow-2xl max-h-[85vh] flex flex-col border-t border-slate-700">
                 <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
                     <h3 class="font-bold text-sm text-amber-400"><i class="fa-solid fa-receipt"></i> Keranjang Pesanan</h3>
                     <button onclick="closeCart()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
                 </div>
+                
                 <div id="cartItemsList" class="flex-1 overflow-y-auto space-y-2.5 pr-1 my-1"></div>
+                
                 <div class="border-t border-slate-800 pt-3 mt-2 space-y-2">
                     <div class="flex justify-between text-xs text-slate-300">
                         <span>Pemesan / Meja:</span>
                         <span class="font-bold text-amber-400"><span id="cartCustomerName">-</span> (<span id="cartTableName">Meja 01</span>)</span>
                     </div>
-                    <div class="flex justify-between font-bold text-sm">
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <span>Subtotal:</span>
+                        <span id="cartSubtotal" class="font-semibold text-slate-200">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-300">
+                        <span>Biaya Layanan / Pajak (10%):</span>
+                        <span id="cartTax" class="font-semibold text-slate-200">Rp 0</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-sm border-t border-slate-800/80 pt-1.5">
                         <span>Total Pembayaran:</span>
                         <span id="cartTotalPrice" class="text-amber-400 text-base">Rp 0</span>
                     </div>
-                    <button onclick="checkoutWhatsApp()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-2 mt-2 text-xs">
-                        <i class="fa-brands fa-whatsapp text-base"></i> Kirim Pesanan ke Kasir
-                    </button>
+
+                    <!-- PILIHAN METODE PEMBAYARAN -->
+                    <div class="pt-2">
+                        <label class="block text-[11px] font-bold text-slate-300 mb-1">Pilih Metode Pembayaran:</label>
+                        <div class="grid grid-cols-3 gap-2 text-xs">
+                            <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500">
+                                <input type="radio" name="paymentMethod" value="Cash" checked class="accent-amber-500"> Cash
+                            </label>
+                            <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500">
+                                <input type="radio" name="paymentMethod" value="QRIS" class="accent-amber-500"> QRIS
+                            </label>
+                            <label class="flex items-center justify-center gap-1.5 p-2 bg-slate-900 border border-slate-700 rounded-xl cursor-pointer hover:border-amber-500">
+                                <input type="radio" name="paymentMethod" value="Transfer Bank" class="accent-amber-500"> Transfer
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button onclick="printReceipt()" class="py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold rounded-2xl shadow transition flex items-center justify-center gap-1.5 text-xs border border-slate-700">
+                            <i class="fa-solid fa-print"></i> Cetak Struk
+                        </button>
+                        <button onclick="checkoutWhatsApp()" class="py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-2xl shadow-lg transition flex items-center justify-center gap-1.5 text-xs">
+                            <i class="fa-brands fa-whatsapp"></i> Kirim ke Kasir
+                        </button>
+                    </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- HIDDEN PRINTABLE RECEIPT TEMPLATE -->
+        <div id="printableReceipt" class="hidden p-6 text-slate-950 font-mono bg-white">
+            <div class="text-center space-y-1 pb-3 border-b border-dashed border-slate-400">
+                <h2 id="receiptRestoName" class="font-bold text-base">Resto & Cafe</h2>
+                <p class="text-[11px]">Struk Pembayaran Pesanan</p>
+            </div>
+            <div class="py-2 text-[11px] space-y-0.5 border-b border-dashed border-slate-400">
+                <div class="flex justify-between"><span>No. Pesanan:</span> <span id="recOrderNo">-</span></div>
+                <div class="flex justify-between"><span>Tanggal:</span> <span id="recDate">-</span></div>
+                <div class="flex justify-between"><span>Pelanggan:</span> <span id="recCustomer">-</span></div>
+                <div class="flex justify-between"><span>Meja:</span> <span id="recTable">-</span></div>
+                <div class="flex justify-between"><span>Pembayaran:</span> <span id="recPayment">-</span></div>
+            </div>
+            <div class="py-2 text-[11px] space-y-1 border-b border-dashed border-slate-400" id="recItemsList">
+                <!-- Items injected here -->
+            </div>
+            <div class="py-2 text-[11px] space-y-1 border-b border-dashed border-slate-400">
+                <div class="flex justify-between"><span>Subtotal:</span> <span id="recSubtotal">Rp 0</span></div>
+                <div class="flex justify-between"><span>Pajak / Layanan (10%):</span> <span id="recTax">Rp 0</span></div>
+                <div class="flex justify-between font-bold text-xs pt-1"><span>Total:</span> <span id="recTotal">Rp 0</span></div>
+            </div>
+            <div class="text-center pt-3 text-[10px] text-slate-600">
+                <p>Terima kasih atas kunjungan Anda!</p>
+                <p>Silakan datang kembali.</p>
             </div>
         </div>
     </div>
@@ -223,8 +300,10 @@
         let menus = JSON.parse(localStorage.getItem(STORAGE_KEY_MENUS)) || [];
         let currentTable = localStorage.getItem(STORAGE_KEY_TABLE) || "Meja 01";
         let customerName = localStorage.getItem('customer_name') || "";
+        let customerEmail = localStorage.getItem('customer_email') || "";
         let googleScriptUrl = localStorage.getItem(STORAGE_KEY_SCRIPT) || "";
         let activeCategory = "All";
+        let cart = [];
         const adminWhatsAppNumber = "6289525935034";
         const ADMIN_PIN = "170620";
 
@@ -286,15 +365,19 @@
             }
         }
 
-        function saveCustomerName(e) {
+        function saveCustomerData(e) {
             e.preventDefault();
             let name = document.getElementById('inputCustomerName').value.trim();
+            let email = document.getElementById('inputCustomerEmail').value.trim();
             if (name) {
                 customerName = name;
+                customerEmail = email;
                 localStorage.setItem('customer_name', customerName);
+                localStorage.setItem('customer_email', customerEmail);
                 document.getElementById('currentCustomerName').innerText = customerName;
                 document.getElementById('welcomeModal').classList.add('hidden');
                 document.getElementById('inputCustomerName').value = "";
+                document.getElementById('inputCustomerEmail').value = "";
                 renderCustomerMenu();
             }
         }
@@ -323,12 +406,17 @@
             }
         }
 
-        function changeCustomerName() {
+        function changeCustomerDataPrompt() {
             let newName = prompt("Ubah Nama Pemesan:", customerName);
             if (newName && newName.trim() !== "") {
                 customerName = newName.trim();
                 localStorage.setItem('customer_name', customerName);
                 document.getElementById('currentCustomerName').innerText = customerName;
+            }
+            let newEmail = prompt("Ubah Email untuk Riwayat Struk:", customerEmail);
+            if (newEmail !== null) {
+                customerEmail = newEmail.trim();
+                localStorage.setItem('customer_email', customerEmail);
             }
         }
 
@@ -400,7 +488,6 @@
             renderCustomerMenu();
         }
 
-        let cart = [];
         function addToCart(id) {
             const menu = menus.find(m => m.id == id);
             const existing = cart.find(item => item.id == id);
@@ -417,6 +504,13 @@
             } else {
                 badge.classList.add('hidden');
             }
+        }
+
+        function calculateTotals() {
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const tax = Math.round(subtotal * 0.10);
+            const total = subtotal + tax;
+            return { subtotal, tax, total };
         }
 
         function openCart() {
@@ -443,8 +537,12 @@
             }
             document.getElementById('cartTableName').innerText = currentTable;
             document.getElementById('cartCustomerName').innerText = customerName;
-            const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            document.getElementById('cartTotalPrice').innerText = `Rp ${totalPrice.toLocaleString('id-ID')}`;
+            
+            const { subtotal, tax, total } = calculateTotals();
+            document.getElementById('cartSubtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
+            document.getElementById('cartTax').innerText = `Rp ${tax.toLocaleString('id-ID')}`;
+            document.getElementById('cartTotalPrice').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+            
             document.getElementById('cartModal').classList.remove('hidden');
         }
 
@@ -457,27 +555,90 @@
             openCart();
         }
 
-        function checkoutWhatsApp() {
-            if (cart.length === 0) return;
-            let message = `Halo Kasir *${restoName}*, pesanan baru:%0A`;
-            message += `👤 Nama: *${customerName}*%0A`;
-            message += `🪑 Meja: *${currentTable}*%0A%0A`;
-            message += `*Daftar Pesanan:*%0A`;
-            let total = 0;
+        function getSelectedPaymentMethod() {
+            const radios = document.getElementsByName('paymentMethod');
+            for (let r of radios) {
+                if (r.checked) return r.value;
+            }
+            return 'Cash';
+        }
+
+        function prepareReceiptDOM() {
+            const { subtotal, tax, total } = calculateTotals();
+            const orderNo = 'INV-' + Math.floor(100000 + Math.random() * 900000);
+            const paymentMethod = getSelectedPaymentMethod();
+
+            document.getElementById('receiptRestoName').innerText = restoName;
+            document.getElementById('recOrderNo').innerText = orderNo;
+            document.getElementById('recDate').innerText = new Date().toLocaleString('id-ID');
+            document.getElementById('recCustomer').innerText = customerName;
+            document.getElementById('recTable').innerText = currentTable;
+            document.getElementById('recPayment').innerText = paymentMethod;
+
+            let itemsHtml = '';
             cart.forEach(item => {
-                let subtotal = item.price * item.qty;
-                total += subtotal;
-                message += `- ${item.name} (${item.qty}x) = Rp ${subtotal.toLocaleString('id-ID')}%0A`;
+                itemsHtml += `<div class="flex justify-between"><span>${item.name} (${item.qty}x)</span> <span>Rp ${(item.price * item.qty).toLocaleString('id-ID')}</span></div>`;
             });
-            message += `%0A*Total Bayar: Rp ${total.toLocaleString('id-ID')}*`;
-            
+            document.getElementById('recItemsList').innerHTML = itemsHtml;
+
+            document.getElementById('recSubtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
+            document.getElementById('recTax').innerText = `Rp ${tax.toLocaleString('id-ID')}`;
+            document.getElementById('recTotal').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+
+            return { orderNo, paymentMethod, subtotal, tax, total };
+        }
+
+        function printReceipt() {
+            if (cart.length === 0) return;
+            prepareReceiptDOM();
+            window.print();
+        }
+
+        async function checkoutWhatsApp() {
+            if (cart.length === 0) return;
+            const { subtotal, tax, total } = calculateTotals();
+            const paymentMethod = getSelectedPaymentMethod();
+            const orderNo = 'INV-' + Math.floor(100000 + Math.random() * 900000);
+
+            let message = `Halo Kasir *${restoName}*, pesanan baru (%${orderNo}):%0A`;
+            message += `👤 Nama: *${customerName}*%0A`;
+            message += `✉️ Email: *${customerEmail || '-'}*%0A`;
+            message += `🪑 Meja: *${currentTable}*%0A`;
+            message += `💳 Pembayaran: *${paymentMethod}*%0A%0A`;
+            message += `*Daftar Pesanan:*%0A`;
+            cart.forEach(item => {
+                let sub = item.price * item.qty;
+                message += `- ${item.name} (${item.qty}x) = Rp ${sub.toLocaleString('id-ID')}%0A`;
+            });
+            message += `%0ASubtotal: Rp ${subtotal.toLocaleString('id-ID')}%0A`;
+            message += `Pajak/Layanan (10%): Rp ${tax.toLocaleString('id-ID')}%0A`;
+            message += `*Total Bayar: Rp ${total.toLocaleString('id-ID')}*`;
+
+            // Kirim data riwayat & email ke cloud Google Apps Script jika URL aktif
+            if (googleScriptUrl && customerEmail) {
+                await postToCloud({
+                    action: "sendOrderHistory",
+                    orderNo,
+                    customerName,
+                    customerEmail,
+                    currentTable,
+                    paymentMethod,
+                    cart: JSON.stringify(cart),
+                    subtotal,
+                    tax,
+                    total
+                });
+            }
+
             window.open(`https://wa.me/${adminWhatsAppNumber}?text=${message}`, '_blank');
 
             closeCart();
             cart = [];
             updateCartBadge();
             localStorage.removeItem('customer_name');
+            localStorage.removeItem('customer_email');
             customerName = "";
+            customerEmail = "";
             document.getElementById('welcomeModal').classList.remove('hidden');
         }
 
@@ -539,8 +700,13 @@
 
             localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
             postToCloud({ action: "saveOrUpdateMenu", ...menuData });
-            resetForm();
+
+            document.getElementById('menuForm').reset();
+            document.getElementById('menuId').value = "";
+            document.getElementById('formTitle').innerText = "Tambah Menu Baru";
             renderAdminCards();
+            renderCustomerMenu();
+            alert("Menu berhasil disimpan!");
         }
 
         function editMenu(id) {
@@ -552,16 +718,7 @@
             document.getElementById('inputPrice').value = menu.price;
             document.getElementById('inputImage').value = menu.image || '';
             document.getElementById('inputDesc').value = menu.desc || '';
-            document.getElementById('formTitle').innerText = "Edit: " + menu.name;
-        }
-
-        function deleteMenu(id) {
-            if (confirm("Hapus menu ini?")) {
-                menus = menus.filter(m => m.id != id);
-                localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
-                postToCloud({ action: "deleteMenu", id: id });
-                renderAdminCards();
-            }
+            document.getElementById('formTitle').innerText = "Edit Menu: " + menu.name;
         }
 
         function toggleStock(id) {
@@ -571,13 +728,18 @@
                 localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
                 postToCloud({ action: "saveOrUpdateMenu", ...menu });
                 renderAdminCards();
+                renderCustomerMenu();
             }
         }
 
-        function resetForm() {
-            document.getElementById('menuForm').reset();
-            document.getElementById('menuId').value = "";
-            document.getElementById('formTitle').innerText = "Tambah Menu Baru";
+        function deleteMenu(id) {
+            if (confirm("Hapus menu ini?")) {
+                menus = menus.filter(m => m.id != id);
+                localStorage.setItem(STORAGE_KEY_MENUS, JSON.stringify(menus));
+                postToCloud({ action: "deleteMenu", id });
+                renderAdminCards();
+                renderCustomerMenu();
+            }
         }
     </script>
 </body>
