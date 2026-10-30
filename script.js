@@ -337,10 +337,13 @@ function openVirtualAccountModal(orderNo, total) {
 
 function closeOnlinePaymentModal() {
     document.getElementById('onlinePaymentModal').classList.add('hidden');
+    openCart(); // Kembali membuka modal keranjang ketika dibatalkan
 }
 
 async function simulateSuccessfulPayment() {
     closeOnlinePaymentModal();
+    // Jangan lupa tutup cart juga kalau sebelumnya dibuka ulang di closeOnlinePaymentModal
+    document.getElementById('cartModal').classList.add('hidden'); 
     await finalizeOrderDirectly(currentTransactionData.paymentMethod);
 }
 
