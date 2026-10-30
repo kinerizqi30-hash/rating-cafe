@@ -19,8 +19,8 @@ const ADMIN_PIN = "170620";
 
 // KONFIGURASI REKENING OWNER
 const ownerBankName = "BCA";
-const ownerAccountNumber = "1234567890"; // Ganti dengan nomor rekening owner asli
-const ownerAccountName = "Nama Pemilik Resto";
+const ownerAccountNumber = "7295061863"; // Ganti dengan nomor rekening owner asli
+const ownerAccountName = "Muhammad Rizqi";
 
 async function initApp() {
     document.getElementById('appTitle').innerText = restoName;
